@@ -16,7 +16,7 @@
     2. Activate PubSub API
     3. Create Service Account with the following Roles
         - PubSub Publisher
-        - (PubSub Viewer)
+        - (PubSub Subscriber)
         - (PubSub Viewer)
     4. Download service account's credentials
         - Put them to ../credentials OR to GCP Secret Manager
