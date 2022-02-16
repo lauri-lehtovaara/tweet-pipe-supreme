@@ -14,7 +14,9 @@ const tweet_pubsub_1 = require("./tweet-pubsub");
 const tweetStreamConfig = {
     streamUrl: 'https://api.twitter.com/2/tweets/search/stream',
     authToken: process.env.TWITTER_API_AUTH_TOKEN,
-    maxQueueSize: 5,
+    maxQueueSize: (process.env.TWEET_STREAM_MAX_QUEUE_SIZE
+        ? parseInt(process.env.TWEET_STREAM_MAX_QUEUE_SIZE)
+        : 10000)
 };
 const tweetPubSubConfig = {
     projectId: process.env.TWEET_PUBSUB_PROJECT_ID,
@@ -45,40 +47,23 @@ function run() {
             console.error(error);
             return;
         }
-        console.debug('Tweet stream ready: ', tweetStream.ready());
-        console.debug('Tweet stream error: ', tweetStream.error);
         while (true) {
-            const tweet = tweetStream.next();
-            if (tweet) {
-                console.debug(tweet);
-                yield tweetPubSub.publish(tweet);
+            try {
+                const tweet = tweetStream.next();
+                if (tweet) {
+                    console.debug(tweet);
+                    yield tweetPubSub.publish(tweet);
+                }
+                else {
+                    yield sleep(10);
+                }
             }
-            else {
-                yield sleep(10);
+            catch (error) {
+                console.error(error);
+                break;
             }
         }
     });
 }
 run();
-/*
-async function run() {
-    try {
-    const pubsub = await initPubSub();
-    const stream = await initTweetStream();
-    
-    while( stream.isOpen() ) {
-        const tweet = await stream.next();
-        
-        await pubsub.publish(
-        'tweet',
-        tweet
-        );
-    }
-    } catch(error) {
-    console.error('Error: ' + error.message);
-    }
-}
-*/
-//run()
-//const authToken = 'AAAAAAAAAAAAAAAAAAAAAKb0ZAEAAAAA1ngtv40aPOsIvFxwOJfnyFtvBvQ%3Dr4phQmf37le8G2JOgust8qm0XITZ4WaI7y3ZZpsxg1r0sKdkH2';
 //# sourceMappingURL=index.js.map

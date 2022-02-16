@@ -29,7 +29,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TweetStream = exports.TweetStreamConfig = void 0;
-const needle = __importStar(require("needle"));
+const https = __importStar(require("https"));
 const tweet_1 = require("./tweet");
 /**
  * TweetStreamConfig
@@ -52,7 +52,6 @@ class TweetStream {
         this.config = config;
         this.queue = [];
         this.isOpen = false;
-        this.reconnectTimeout = 100;
     }
     /**
      * error if has one
@@ -62,27 +61,39 @@ class TweetStream {
     }
     /**
      * connect
+     *
+     * connects to twitter api and starts recording tweets
      */
     connect() {
         return __awaiter(this, void 0, void 0, function* () {
             const { streamUrl, authToken } = this.config;
             const options = {
                 headers: {
-                    "User-Agent": "tweet-stream",
-                    //"Content-Type":  "application/json",
+                    "Content-type": "application/json",
                     "Authorization": `Bearer ${authToken}`
                 }
             };
-            const stream = needle.get(streamUrl, options);
-            const onResponse = this.onResponse.bind(this);
             const onData = this.onData.bind(this);
             const onError = this.onError.bind(this);
             const onEnd = this.onEnd.bind(this);
-            stream.on('data', onData);
-            stream.on('err', onError);
-            stream.on('done', onEnd);
-            stream.on('response', onResponse);
-            return stream;
+            return new Promise((resolve, reject) => {
+                this.request = https.get(streamUrl, options, response => {
+                    if (response.statusCode !== 200) {
+                        const error = new Error('Authentication failed');
+                        onError(error);
+                        return reject(error);
+                    }
+                    response.on('data', onData);
+                    response.on('error', onError);
+                    response.on('end', onEnd);
+                    this.isOpen = true;
+                    resolve();
+                })
+                    .on('error', (error) => {
+                    onError(error);
+                    reject(error);
+                });
+            });
         });
     }
     /**
@@ -114,34 +125,33 @@ class TweetStream {
     /**
      * close
      */
-    //async close() {
-    //    return this.stream.destory();
-    //}
+    close() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.request.destroy();
+        });
+    }
     /**
      * onData
      *
      * translates received data to tweet
      * note: do not call directly
      */
-    onData(data) {
-        if (!data)
+    onData(buffer) {
+        if (!buffer)
             return;
-        if (!(data instanceof Buffer))
-            return this.onError(Error(JSON.stringify(data)));
         try {
-            const jsonString = data.toString('utf-8');
-            //console.debug(jsonString);
+            const jsonString = buffer.toString('utf-8');
             if (jsonString == '\r\n') {
                 console.debug('<<< TweetStream got keep alive >>>');
                 return;
             }
-            const json = JSON.parse(jsonString);
+            const data = JSON.parse(jsonString);
             //console.debug(data);
             if (this.queue.length >= this.config.maxQueueSize) {
                 console.debug("Tweet stream's queue is full... dropping oldest");
                 this.queue.shift();
             }
-            const tweet = tweet_1.Tweet.fromTwitterJson(json);
+            const tweet = tweet_1.Tweet.fromTwitterJson(data);
             //console.debug(tweet);
             this.queue.push(tweet);
         }
@@ -151,23 +161,12 @@ class TweetStream {
         }
     }
     /**
-     * onOpen
-     *
-     * stream is open... but might have error
-     * note: do not call directly
-     */
-    onResponse() {
-        console.debug('TweetStream opened');
-        this.isOpen = true;
-    }
-    /**
      * onEnd
      *
      * not open any more
      * note: do not call directly
      */
     onEnd() {
-        console.debug('TweetStream closed');
         this.isOpen = false;
     }
     /**
@@ -177,21 +176,9 @@ class TweetStream {
      * note: do not call directly
      */
     onError(error) {
-        // on connection reset, try to reconnect
-        if (error.code === 'ECONNRESET') {
-            const connect = this.connect.bind(this);
-            this.reconnectTimeout = Math.min(this.reconnectTimeout * 2, 10000);
-            setTimeout(() => {
-                console.warn("TweetStream faced a connection error occurred. Reconnecting...");
-                connect();
-            }, this.reconnectTimeout);
-        }
-        // otherwise, just set the error
-        else {
-            console.debug(error);
-            this._error = error;
-        }
+        console.debug(error);
+        this._error = error;
     }
 }
 exports.TweetStream = TweetStream;
-//# sourceMappingURL=tweet-stream.js.map
+//# sourceMappingURL=tweet-stream.https.js.map
