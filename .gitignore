@@ -1,0 +1,9 @@
+
+# Credentials should NEVER be stored in repo
+# Preferably use GCP Secret manager
+credentials/
+
+# Ignore emacs backups
+*~
+.\#*
+\#*\#
