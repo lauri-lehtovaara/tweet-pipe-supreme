@@ -44,19 +44,19 @@ Demonstrate a streaming data pipeline with machine-learning components on Google
 	1) Read tweets from PubSub
 	* Status: working
 	
-3) DataFlowPipeline - phase 2: batch language detect
+3) DataFlowPipeline - phase 2: batch language detection
 	1) Read tweets (jsonp) from GCP bucket
 	2) Detect language
 	3) Write tweets with language to GCP bucket
 	* Status: working
 	
-4) DataFlowPipeline - phase 3: streaming language detect
+4) DataFlowPipeline - phase 3: streaming language detection
 	1) Read tweets from PubSub
 	2) Detect language
 	3) Write tweets to PubSub
 	* Status: todo
 	
-5) DataFlowPipeline - phase 4: sentiment detect
+5) DataFlowPipeline - phase 4: streaming sentiment detection
 	* Status: todo
 	* Next steps: 
 		* train model in Colab (TweetEval + LaBSE)
