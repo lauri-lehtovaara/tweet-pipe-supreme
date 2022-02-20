@@ -1,0 +1,3 @@
+{ "id": "test1", "text": "This is english", "user": "test", "timestamp": "2022-02-18T10:26:17.028Z" }
+{ "id": "test2", "text": "Jag pratar svenska", "user": "test", "timestamp": "2022-02-18T10:26:17.028Z" }
+{ "id": "test3", "text": "Mitäs mitäs suomea!!!", "user": "test", "timestamp": "2022-02-18T10:26:17.028Z" }
