@@ -2,7 +2,7 @@
 
 ## Goal
 
-Demonstrate streaming machine-learning pipeline on Google Cloud Platform (GCP).
+Demonstrate a streaming data pipeline with machine-learning components on Google Cloud Platform (GCP) using Twitter API as its data source.
 
 1) Read tweets from Twitter API (e.g. #covid)
 2) Write tweets to PubSub
