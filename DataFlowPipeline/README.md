@@ -66,7 +66,7 @@ See
    
 5. Install your own pipeline as editable python package
    ```
-   pip install -e /app
+   pip install -e /app -r /app/requirements.txt
 
    ```
    
@@ -109,7 +109,20 @@ See
 
 Install package as editable so that you can `import` it and 
 its (sub)modules as it would be installed normally:
-`pip install -e`
+`pip install -e <path> -r requirements.txt`
+
+### Linting
+
+Show linting errors
+`pylint src/tweetpipesupreme`
+
+Autofix
+`autopep8 --in-place src/tweetpipesupreme`
+
+### Testing
+
+`pytest`
+
 
 
 ## DOES NOT WORK: Install Mac M1... why?!? 

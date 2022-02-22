@@ -24,6 +24,7 @@ setuptools.setup(
     packages=setuptools.find_packages(where="src"),
     python_requires=">=3.8",
     install_requires=[
+        "apache-beam[gcp]>=2.36.0",
         "fasttext>=0.9.2"
     ]
 )

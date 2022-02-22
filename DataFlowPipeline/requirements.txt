@@ -1,0 +1,6 @@
+# testing
+pytest
+
+# linting
+pylint
+autopep8
