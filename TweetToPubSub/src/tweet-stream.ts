@@ -2,10 +2,12 @@ import * as needle  from 'needle';
 
 import { Tweet } from './tweet';
 
+import { logger } from './logger';
+
 /**
  * TweetStreamConfig
  */
-export class TweetStreamConfig {
+export interface TweetStreamConfig {
     public maxQueueSize: number;
     public streamUrl: string;
     public authToken: string;
@@ -13,7 +15,7 @@ export class TweetStreamConfig {
 
 /**
  * TweetStream
- * 
+ *
  * see https://developer.twitter.com/en/docs/twitter-api/tweets/filtered-stream/quick-start
  *
  */
@@ -25,7 +27,7 @@ export class TweetStream {
     protected _error: Error;
 
     protected reconnectTimeout: number = 100;
-    
+
 
     /**
      * error if has one
@@ -33,23 +35,23 @@ export class TweetStream {
     public get error() : Error {
 	return this._error;
     }
-    
+
     /**
      * constructor
      */
     constructor(protected config: TweetStreamConfig) {}
 
-    
+
     /**
      * connect
      */
     async connect() : Promise<needle.ReadableStream> {
 	const { streamUrl, authToken } = this.config;
-	
+
 	const options = {
 	    headers: {
 		"User-Agent":    "tweet-stream",
-		//"Content-Type":  "application/json",
+		// "Content-Type":  "application/json",
 		"Authorization": `Bearer ${authToken}`
 	    }
 	};
@@ -63,7 +65,7 @@ export class TweetStream {
 	const onData  = this.onData.bind(this);
 	const onError = this.onError.bind(this);
 	const onEnd   = this.onEnd.bind(this);
-	
+
 	stream.on('data', onData);
 	stream.on('err', onError);
 	stream.on('done', onEnd);
@@ -71,7 +73,15 @@ export class TweetStream {
 
 	return stream;
     }
-			  
+
+    /**
+     * TODO: set rules
+     *
+     * get old rules, delte old rules, set new rules
+     */
+    // async setRules(rules) {
+    //
+    // }
 
     /**
      * ready
@@ -81,14 +91,14 @@ export class TweetStream {
     ready() : boolean {
 	if ( this._error )
 	    return false;
-	
+
 	if ( this.isOpen )
 	    return true;
 
 	return false;
     }
-    
-    
+
+
     /**
      * next
      *
@@ -98,24 +108,24 @@ export class TweetStream {
      */
     next() : Tweet | undefined {
 	const tweet = this.queue.shift();
-	
+
 	if ( tweet )
 	    return tweet;
-	
+
 	if ( this._error )
 	    throw this._error;
     }
-    
+
     /**
      * close
      */
-    //async close() {
+    // async close() {
     //    return this.stream.destory();
-    //}
+    // }
 
     /**
      * onData
-     * 
+     *
      * translates received data to tweet
      * note: do not call directly
      */
@@ -127,29 +137,29 @@ export class TweetStream {
 
 	try {
 	    const jsonString = data.toString('utf-8');
-	    //console.debug(jsonString);
-	    
-	    if ( jsonString == '\r\n' ) {
-		console.debug('<<< TweetStream got keep alive >>>');
+	    // logger.debug(jsonString);
+
+	    if ( jsonString === '\r\n' ) {
+		logger.debug('<<< TweetStream got keep alive >>>');
 		return;
 	    }
 
 	    const json = JSON.parse(jsonString);
-	    //console.debug(data);
-	    
+	    // logger.debug(data);
+
 	    if ( this.queue.length >= this.config.maxQueueSize ) {
-		console.debug("Tweet stream's queue is full... dropping oldest");
+		logger.debug("Tweet stream's queue is full... dropping oldest");
 		this.queue.shift();
 	    }
 
 	    const tweet = Tweet.fromTwitterJson(json);
 
-	    //console.debug(tweet);
-	    
+	    // logger.debug(tweet);
+
 	    this.queue.push(tweet);
-	    
+
 	} catch(error) {
-	    console.debug(error);
+	    logger.debug(error);
 	    this._error = error;
 	}
     }
@@ -160,9 +170,9 @@ export class TweetStream {
      *
      * stream is open... but might have error
      * note: do not call directly
-     */    
+     */
     protected onResponse() {
-	console.debug('TweetStream opened');
+	logger.debug('TweetStream opened');
 	this.isOpen = true;
     }
 
@@ -171,33 +181,33 @@ export class TweetStream {
      *
      * not open any more
      * note: do not call directly
-     */    
+     */
     protected onEnd() {
-	console.debug('TweetStream closed');
+	logger.debug('TweetStream closed');
 	this.isOpen = false;
     }
-    
+
     /**
      * onError
      *
      * just set error
      * note: do not call directly
-     */    
+     */
     protected onError(error: NodeJS.ErrnoException) {
 	// on connection reset, try to reconnect
 	if (  error.code === 'ECONNRESET' ) {
 	    const connect = this.connect.bind(this);
 	    this.reconnectTimeout = Math.min(this.reconnectTimeout * 2, 10000);
-		
+
 	    setTimeout(() => {
-                console.warn("TweetStream faced a connection error occurred. Reconnecting...");
+                logger.warn("TweetStream faced a connection error occurred. Reconnecting...");
 		connect();
             }, this.reconnectTimeout);
 	}
 
 	// otherwise, just set the error
 	else {
-	    console.debug(error);
+	    logger.debug(error);
 	    this._error = error;
 	}
     }
