@@ -4,7 +4,7 @@ import { Tweet } from './tweet';
 /**
  * TweetPubSubConfig
  */
-export class TweetPubSubConfig {
+export interface TweetPubSubConfig {
     public projectId: string;
     public topic: string;
 }
@@ -14,7 +14,7 @@ export class TweetPubSubConfig {
  */
 export class TweetPubSub {
     protected pubsub: PubSub;
-    
+
     constructor(protected config: TweetPubSubConfig) {}
 
     /**
@@ -30,7 +30,7 @@ export class TweetPubSub {
      */
     async publish(tweet: Tweet) {
 	const { topic } = this.config;
-	    
+
 	const buffer = Buffer.from(Tweet.toJson(tweet), 'utf-8');
 	return await this.pubsub
 	    .topic(topic)

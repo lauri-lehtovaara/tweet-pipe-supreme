@@ -1,12 +1,14 @@
 import { TweetStream } from './tweet-stream';
 import { TweetPubSub } from './tweet-pubsub';
 
+import { logger } from './logger';
+
 const tweetStreamConfig = {
     streamUrl: 'https://api.twitter.com/2/tweets/search/stream',
     authToken: process.env.TWITTER_API_AUTH_TOKEN,
     maxQueueSize: (
 	process.env.TWEET_STREAM_MAX_QUEUE_SIZE
-	    ? parseInt(process.env.TWEET_STREAM_MAX_QUEUE_SIZE)
+	    ? parseInt(process.env.TWEET_STREAM_MAX_QUEUE_SIZE,10)
 	    : 10000
     )
 };
@@ -15,6 +17,8 @@ const tweetPubSubConfig = {
     projectId: process.env.TWEET_PUBSUB_PROJECT_ID,
     topic:     process.env.TWEET_TOPIC,
 }
+
+
 
 
 async function sleep(ms) {
@@ -30,7 +34,7 @@ async function run() {
     try {
 	await tweetPubSub.connect();
     } catch(error) {
-	console.error(error);
+	logger.error(error);
 	return;
     }
 
@@ -39,22 +43,22 @@ async function run() {
     try {
 	await tweetStream.connect();
     } catch(error) {
-	console.error(error);
+	logger.error(error);
 	return;
     }
-    
+
     while(true) {
 	try {
 	    const tweet = tweetStream.next();
 	    if ( tweet ) {
-		console.debug(tweet);
+		logger.debug('Tweet received', { tweet });
 		await tweetPubSub.publish(tweet);
 	    }
 	    else {
 		await sleep(10);
 	    }
 	} catch(error) {
-	    console.error(error);
+	    logger.error(error);
 	    break;
 	}
     }

@@ -15,7 +15,7 @@
 export class Tweet {
     public id: string;
     public text: string;
-    
+
     static fromTwitterJson(json: any) : Tweet {
 	const { data } = json;
 	const { id, text } = data;
@@ -24,7 +24,7 @@ export class Tweet {
 
     static toJson(tweet: Tweet) {
 	const { id, text } = tweet;
-	
+
 	return JSON.stringify({
 	    id,
 	    text

@@ -31,6 +31,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TweetStream = exports.TweetStreamConfig = void 0;
 const https = __importStar(require("https"));
 const tweet_1 = require("./tweet");
+const logger_1 = require("./logger");
 /**
  * TweetStreamConfig
  */
@@ -142,21 +143,21 @@ class TweetStream {
         try {
             const jsonString = buffer.toString('utf-8');
             if (jsonString == '\r\n') {
-                console.debug('<<< TweetStream got keep alive >>>');
+                logger_1.logger.debug('<<< TweetStream got keep alive >>>');
                 return;
             }
             const data = JSON.parse(jsonString);
-            //console.debug(data);
+            //logger.debug(data);
             if (this.queue.length >= this.config.maxQueueSize) {
-                console.debug("Tweet stream's queue is full... dropping oldest");
+                logger_1.logger.debug("Tweet stream's queue is full... dropping oldest");
                 this.queue.shift();
             }
             const tweet = tweet_1.Tweet.fromTwitterJson(data);
-            //console.debug(tweet);
+            //logger.debug(tweet);
             this.queue.push(tweet);
         }
         catch (error) {
-            console.debug(error);
+            logger_1.logger.debug(error);
             this._error = error;
         }
     }
@@ -176,7 +177,7 @@ class TweetStream {
      * note: do not call directly
      */
     onError(error) {
-        console.debug(error);
+        logger_1.logger.debug(error);
         this._error = error;
     }
 }

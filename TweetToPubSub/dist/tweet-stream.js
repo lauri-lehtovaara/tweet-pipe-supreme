@@ -31,6 +31,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TweetStream = exports.TweetStreamConfig = void 0;
 const needle = __importStar(require("needle"));
 const tweet_1 = require("./tweet");
+const logger_1 = require("./logger");
 /**
  * TweetStreamConfig
  */
@@ -86,6 +87,14 @@ class TweetStream {
         });
     }
     /**
+     * TODO: set rules
+     *
+     * get old rules, delte old rules, set new rules
+     */
+    //async setRules(rules) {
+    //	
+    //}
+    /**
      * ready
      *
      * returns true if stream is ready and recording tweets
@@ -130,23 +139,23 @@ class TweetStream {
             return this.onError(Error(JSON.stringify(data)));
         try {
             const jsonString = data.toString('utf-8');
-            //console.debug(jsonString);
+            //logger.debug(jsonString);
             if (jsonString == '\r\n') {
-                console.debug('<<< TweetStream got keep alive >>>');
+                logger_1.logger.debug('<<< TweetStream got keep alive >>>');
                 return;
             }
             const json = JSON.parse(jsonString);
-            //console.debug(data);
+            //logger.debug(data);
             if (this.queue.length >= this.config.maxQueueSize) {
-                console.debug("Tweet stream's queue is full... dropping oldest");
+                logger_1.logger.debug("Tweet stream's queue is full... dropping oldest");
                 this.queue.shift();
             }
             const tweet = tweet_1.Tweet.fromTwitterJson(json);
-            //console.debug(tweet);
+            //logger.debug(tweet);
             this.queue.push(tweet);
         }
         catch (error) {
-            console.debug(error);
+            logger_1.logger.debug(error);
             this._error = error;
         }
     }
@@ -157,7 +166,7 @@ class TweetStream {
      * note: do not call directly
      */
     onResponse() {
-        console.debug('TweetStream opened');
+        logger_1.logger.debug('TweetStream opened');
         this.isOpen = true;
     }
     /**
@@ -167,7 +176,7 @@ class TweetStream {
      * note: do not call directly
      */
     onEnd() {
-        console.debug('TweetStream closed');
+        logger_1.logger.debug('TweetStream closed');
         this.isOpen = false;
     }
     /**
@@ -182,13 +191,13 @@ class TweetStream {
             const connect = this.connect.bind(this);
             this.reconnectTimeout = Math.min(this.reconnectTimeout * 2, 10000);
             setTimeout(() => {
-                console.warn("TweetStream faced a connection error occurred. Reconnecting...");
+                logger_1.logger.warn("TweetStream faced a connection error occurred. Reconnecting...");
                 connect();
             }, this.reconnectTimeout);
         }
         // otherwise, just set the error
         else {
-            console.debug(error);
+            logger_1.logger.debug(error);
             this._error = error;
         }
     }

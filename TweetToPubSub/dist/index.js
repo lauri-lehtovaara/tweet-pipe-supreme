@@ -11,11 +11,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const tweet_stream_1 = require("./tweet-stream");
 const tweet_pubsub_1 = require("./tweet-pubsub");
+const logger_1 = require("./logger");
 const tweetStreamConfig = {
     streamUrl: 'https://api.twitter.com/2/tweets/search/stream',
     authToken: process.env.TWITTER_API_AUTH_TOKEN,
     maxQueueSize: (process.env.TWEET_STREAM_MAX_QUEUE_SIZE
-        ? parseInt(process.env.TWEET_STREAM_MAX_QUEUE_SIZE)
+        ? parseInt(process.env.TWEET_STREAM_MAX_QUEUE_SIZE, 10)
         : 10000)
 };
 const tweetPubSubConfig = {
@@ -35,7 +36,7 @@ function run() {
             yield tweetPubSub.connect();
         }
         catch (error) {
-            console.error(error);
+            logger_1.logger.error(error);
             return;
         }
         // tweet stream from twitter api
@@ -44,14 +45,14 @@ function run() {
             yield tweetStream.connect();
         }
         catch (error) {
-            console.error(error);
+            logger_1.logger.error(error);
             return;
         }
         while (true) {
             try {
                 const tweet = tweetStream.next();
                 if (tweet) {
-                    console.debug(tweet);
+                    logger_1.logger.debug('Tweet received', { tweet });
                     yield tweetPubSub.publish(tweet);
                 }
                 else {
@@ -59,7 +60,7 @@ function run() {
                 }
             }
             catch (error) {
-                console.error(error);
+                logger_1.logger.error(error);
                 break;
             }
         }

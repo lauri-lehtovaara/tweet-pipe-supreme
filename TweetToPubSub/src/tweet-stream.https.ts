@@ -3,10 +3,12 @@ import * as https from 'https';
 
 import { Tweet } from './tweet';
 
+import { logger } from './logger';
+
 /**
  * TweetStreamConfig
  */
-export class TweetStreamConfig {
+export interface TweetStreamConfig {
     public maxQueueSize: number;
     public streamUrl: string;
     public authToken: string;
@@ -14,7 +16,7 @@ export class TweetStreamConfig {
 
 /**
  * TweetStream
- * 
+ *
  * see https://developer.twitter.com/en/docs/twitter-api/tweets/filtered-stream/quick-start
  *
  */
@@ -34,13 +36,13 @@ export class TweetStream {
 	return this._error;
     }
 
-    
+
     /**
      * constructor
      */
     constructor(protected config: TweetStreamConfig) {}
 
-    
+
     /**
      * connect
      *
@@ -48,21 +50,21 @@ export class TweetStream {
      */
     async connect() : Promise<void> {
 	const { streamUrl, authToken } = this.config;
-	
+
 	const options = {
 	    headers: {
 		"Content-type":  "application/json",
 		"Authorization": `Bearer ${authToken}`
 	    }
 	};
-	
+
 	const onData  = this.onData.bind(this);
 	const onError = this.onError.bind(this);
 	const onEnd   = this.onEnd.bind(this);
-	
-	
+
+
 	return new Promise((resolve, reject) => {
-	    
+
 	    this.request = https.get(
 		streamUrl,
 		options,
@@ -72,13 +74,13 @@ export class TweetStream {
 			onError(error);
 			return reject(error);
 		    }
-		    
+
 		    response.on('data', onData);
 		    response.on('error', onError);
 		    response.on('end', onEnd);
 
 		    this.isOpen = true;
-		    
+
 		    resolve();
 		})
 		.on('error', (error) => {
@@ -87,7 +89,7 @@ export class TweetStream {
 		});
 	});
     }
-			  
+
 
     /**
      * ready
@@ -97,14 +99,14 @@ export class TweetStream {
     ready() : boolean {
 	if ( this._error )
 	    return false;
-	
+
 	if ( this.isOpen )
 	    return true;
 
 	return false;
     }
-    
-    
+
+
     /**
      * next
      *
@@ -114,14 +116,14 @@ export class TweetStream {
      */
     next() : Tweet | undefined {
 	const tweet = this.queue.shift();
-	
+
 	if ( tweet )
 	    return tweet;
-	
+
 	if ( this._error )
 	    throw this._error;
     }
-    
+
     /**
      * close
      */
@@ -131,58 +133,58 @@ export class TweetStream {
 
     /**
      * onData
-     * 
+     *
      * translates received data to tweet
      * note: do not call directly
-     */    
+     */
     protected onData(buffer: Buffer) {
 	if ( ! buffer ) return;
 
 	try {
 	    const jsonString = buffer.toString('utf-8');
-	    if ( jsonString == '\r\n' ) {
-		console.debug('<<< TweetStream got keep alive >>>');
+	    if ( jsonString === '\r\n' ) {
+		logger.debug('<<< TweetStream got keep alive >>>');
 		return;
 	    }
-	    
+
 	    const data = JSON.parse(jsonString);
-	    //console.debug(data);
-	    
+	    // logger.debug(data);
+
 	    if ( this.queue.length >= this.config.maxQueueSize ) {
-		console.debug("Tweet stream's queue is full... dropping oldest");
+		logger.debug("Tweet stream's queue is full... dropping oldest");
 		this.queue.shift();
 	    }
 
 	    const tweet = Tweet.fromTwitterJson(data);
 
-	    //console.debug(tweet);
-	    
+	    // logger.debug(tweet);
+
 	    this.queue.push(tweet);
-	    
+
 	} catch(error) {
-	    console.debug(error);
+	    logger.debug(error);
 	    this._error = error;
 	}
     }
-    
+
     /**
      * onEnd
      *
      * not open any more
      * note: do not call directly
-     */    
+     */
     protected onEnd() {
 	this.isOpen = false;
     }
-    
+
     /**
      * onError
      *
      * just set error
      * note: do not call directly
-     */    
+     */
     protected onError(error: Error) {
-	console.debug(error);
+	logger.debug(error);
 	this._error = error;
     }
 }
