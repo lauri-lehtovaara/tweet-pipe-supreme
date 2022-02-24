@@ -1,4 +1,4 @@
-import * as needle  from 'needle';
+import got from 'got';
 
 import { Tweet } from './tweet';
 
@@ -8,9 +8,9 @@ import { logger } from './logger';
  * TweetStreamConfig
  */
 export interface TweetStreamConfig {
-    public maxQueueSize: number;
-    public streamUrl: string;
-    public authToken: string;
+    maxQueueSize: number;
+    streamUrl: string;
+    authToken: string;
 };
 
 /**
@@ -20,6 +20,8 @@ export interface TweetStreamConfig {
  *
  */
 export class TweetStream {
+    protected buffer: Buffer = Buffer.from([]);
+    
     protected queue: Tweet[] = [];
 
     protected isOpen: boolean = false;
@@ -30,22 +32,98 @@ export class TweetStream {
 
 
     /**
-     * error if has one
+     * Error if has one
      */
     public get error() : Error {
 	return this._error;
     }
 
     /**
-     * constructor
+     * Constructor
      */
     constructor(protected config: TweetStreamConfig) {}
 
 
     /**
-     * connect
+     * Reset stream's rules
      */
-    async connect() : Promise<needle.ReadableStream> {
+    async resetRules(rules: string[]) : Promise<void> {
+        const { streamUrl, authToken } = this.config;
+
+        try {
+            // get previous rules
+            const getOptions = {
+	        headers: {
+		    "User-Agent":    "tweet-stream",
+		    // "Content-Type":  "application/json",
+		    "Authorization": `Bearer ${authToken}`
+	        }
+	    };
+            const prevRules = (
+                await got(
+                    `${streamUrl}/rules`,
+                    getOptions,
+                )
+                    .json()
+            ) as { data: { id: string }[] };
+
+            logger.debug('Previous rules for tweet stream', prevRules);
+
+            // extract IDs
+            const prevIDs = (
+                prevRules.data
+                    ? prevRules.data.map((rule) => rule.id)
+                    : []
+            )
+            
+            // delete  previous rules
+            const deleteOptions = {
+	        headers: {
+		    "User-Agent":    "tweet-stream",
+		    // "Content-Type":  "application/json",
+		    "Authorization": `Bearer ${authToken}`
+	        },
+                json: {
+                    delete: { ids: prevIDs },
+                }
+	    };
+            if ( prevIDs.length > 0 )
+                await got.post(
+                    `${streamUrl}/rules`,
+                    deleteOptions,
+                )
+                    .json();
+
+            // set new rules
+            const setOptions = {
+	        headers: {
+		    "User-Agent":    "tweet-stream",
+		    // "Content-Type":  "application/json",
+		    "Authorization": `Bearer ${authToken}`
+	        },
+                json: {
+                    add: rules.map((rule) => ({ value: rule }))
+                }
+	    };
+            const newRules = await got.post(
+                `${streamUrl}/rules`,
+                setOptions,
+            )
+                .json();
+
+            logger.debug('New rules for tweet stream', newRules);
+            
+            return;
+        } catch(error) {
+            logger.error('error');
+            throw error;
+        }
+    }
+
+    /**
+     * Connect
+     */
+    async connect() : Promise<any> {
 	const { streamUrl, authToken } = this.config;
 
 	const options = {
@@ -53,11 +131,12 @@ export class TweetStream {
 		"User-Agent":    "tweet-stream",
 		// "Content-Type":  "application/json",
 		"Authorization": `Bearer ${authToken}`
-	    }
+	    },
+            //timeout: { request: 3600*1000 }
 	};
 
-	const stream = needle.get(
-	    streamUrl,
+	const stream = await got.stream(
+	    `${streamUrl}?tweet.fields=author_id,created_at`,
 	    options
 	);
 
@@ -75,16 +154,7 @@ export class TweetStream {
     }
 
     /**
-     * TODO: set rules
-     *
-     * get old rules, delte old rules, set new rules
-     */
-    // async setRules(rules) {
-    //
-    // }
-
-    /**
-     * ready
+     * Ready
      *
      * returns true if stream is ready and recording tweets
      */
@@ -100,7 +170,7 @@ export class TweetStream {
 
 
     /**
-     * next
+     * Next
      *
      * returns next tweet if has one
      * throws an error if there is an error AND we have consumed all tweets
@@ -117,7 +187,7 @@ export class TweetStream {
     }
 
     /**
-     * close
+     * Close
      */
     // async close() {
     //    return this.stream.destory();
@@ -126,26 +196,49 @@ export class TweetStream {
     /**
      * onData
      *
-     * translates received data to tweet
+     * receives data to a buffer and calls
+     * onLine if the buffer has a new line `\r\n`
+     *
      * note: do not call directly
      */
     protected onData(data: any) {
+        //logger.debug('onData', data);
 	if ( ! data ) return;
 
 	if ( ! ( data instanceof Buffer ) )
-	    return this.onError(Error(JSON.stringify(data)));
+	    return this.onError(new Error(JSON.stringify(data)));
 
-	try {
-	    const jsonString = data.toString('utf-8');
-	    // logger.debug(jsonString);
+        this.buffer = Buffer.concat([this.buffer, data]);
 
-	    if ( jsonString === '\r\n' ) {
+        let pos = this.buffer.indexOf(Buffer.from('\r\n'));
+        while( pos >= 0 ) {
+            const line = this.buffer.slice(0,pos);
+
+            if ( line.length > 0 ) {
+                this.onLine(line.toString('utf-8'));
+            }
+            else {
 		logger.debug('<<< TweetStream got keep alive >>>');
-		return;
-	    }
+            }
+            
+            this.buffer = this.buffer.slice(pos+2);
 
-	    const json = JSON.parse(jsonString);
-	    // logger.debug(data);
+            pos = this.buffer.indexOf(Buffer.from('\r\n'));
+        }
+    }        
+
+    /**
+     * onLine
+     *
+     * translates received JSON line to tweet
+     * note: do not call directly
+     */
+    protected onLine(jsonLine: string) {
+	try {
+	    logger.debug(jsonLine);
+
+	    const json = JSON.parse(jsonLine);
+	    logger.debug(json);
 
 	    if ( this.queue.length >= this.config.maxQueueSize ) {
 		logger.debug("Tweet stream's queue is full... dropping oldest");
@@ -196,11 +289,11 @@ export class TweetStream {
     protected onError(error: NodeJS.ErrnoException) {
 	// on connection reset, try to reconnect
 	if (  error.code === 'ECONNRESET' ) {
+            logger.warn("TweetStream faced a connection error occurred. Reconnecting...");
 	    const connect = this.connect.bind(this);
 	    this.reconnectTimeout = Math.min(this.reconnectTimeout * 2, 10000);
 
 	    setTimeout(() => {
-                logger.warn("TweetStream faced a connection error occurred. Reconnecting...");
 		connect();
             }, this.reconnectTimeout);
 	}

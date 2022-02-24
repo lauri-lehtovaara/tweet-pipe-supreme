@@ -5,8 +5,8 @@ import { Tweet } from './tweet';
  * TweetPubSubConfig
  */
 export interface TweetPubSubConfig {
-    public projectId: string;
-    public topic: string;
+    projectId: string;
+    topic: string;
 }
 
 /**

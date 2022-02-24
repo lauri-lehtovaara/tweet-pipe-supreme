@@ -15,19 +15,17 @@
 export class Tweet {
     public id: string;
     public text: string;
+    public timestamp: string;
+    public author: string;
 
     static fromTwitterJson(json: any) : Tweet {
+        // FIXME: add validation
 	const { data } = json;
-	const { id, text } = data;
-	return { id, text };
+	const { id, text, created_at, author_id } = data;
+	return { id, text, timestamp: created_at, author: author_id };
     }
 
     static toJson(tweet: Tweet) {
-	const { id, text } = tweet;
-
-	return JSON.stringify({
-	    id,
-	    text
-	});
+	return JSON.stringify(tweet)
     }
 }
