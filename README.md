@@ -54,23 +54,23 @@ Demonstrate a streaming data pipeline with machine-learning components on Google
 	1) Read tweets from PubSub
 	2) Detect language
 	3) Write tweets to PubSub
-	* Status: todo
+	* Status: working
 	
-5) DataFlowPipeline - phase 4: sentiment detect
+5) DataFlow to FireStore
+	* Status: todo
+
+6) FireStore to BigQuery
+	* Status: todo
+
+7) BigQuery to DataStudio
+	* Status: todo
+
+8) DataFlowPipeline - phase 4: sentiment detect
 	* Status: todo
 	* Next steps: 
 		* train model in Colab (TweetEval + LaBSE)
 		* save model to GCP bucket
 		* add model to DataFlow / Apache Beam pipeline
-
-6) DataFlow to FireStore
-	* Status: todo
-
-7) FireStore to BigQuery
-	* Status: todo
-
-8) BigQuery to DataStudio
-	* Status: todo
 
 9) Cloud Run API for LaBSE embeddings
 	* Status: todo
