@@ -22,10 +22,14 @@ See
     - Service Account Token Creator
     - Service Account User
     - Dataflow Worker
-    - Pub/Sub Publisher
-    - Pub/Sub Subscriber
-    - Pub/Sub Viewer
-    - Storage Object Admin
+    - Storage:
+        - Storage Object Viewer (for reading models)
+        - Storage Object Admin, if jobs write to Cloud Storage
+    - PubSub:
+        - Pub/Sub Publisher
+        - Pub/Sub Subscriber
+        - Pub/Sub Viewer
+        - (Pub/Sub Admin, if using temporary subscriptions for topics instead of permanent subscriptions)
 
 3. Create bucket `tweet-pipe-supreme`
 
@@ -75,9 +79,9 @@ See
    GOOGLE_APPLICATION_CREDENTIALS=/credentials/<credentials>.json \
    python -m tweetpipesupreme.language \
        --setup_file /app/setup.py \
-       --input gs://tweet-pipe-supreme/dataflow-test/tweets.jsonp \
+       --input gs://tweet-pipe-supreme/dataflow-test/tweets.jsonl \
        --model_path gs://tweet-pipe-supreme/dataflow-test/lid.176.ftz \
-       --output gs://tweet-pipe-supreme/dataflow-test/tweets-with-lang.jsonp \
+       --output gs://tweet-pipe-supreme/dataflow-test/tweets-with-lang \
        --runner DataflowRunner \
        --project tweet-pipe-supreme \
        --region europe-west1 \
@@ -87,14 +91,14 @@ See
 	   --worker_machine_type e2-standard-2 # optional \
    ```
 
-7. TODO: Start our own streaming pipeline (tweet => tweet-with-lang)
+7. Start our own streaming pipeline (tweet => tweet-with-lang)
    ```
    GOOGLE_APPLICATION_CREDENTIALS=/credentials/<credentials>.json \
    python -m tweetpipesupreme.language \
        --setup_file /app/setup.py \
-       --input tweet \
+       --input ps://projects/tweet-pipe-supreme/subscriptions/tweet-sub \
        --model_path gs://tweet-pipe-supreme/dataflow-test/lid.176.ftz \
-       --output tweet-with-lang \
+       --output ps://projects/tweet-pipe-supreme/topics/tweet-with-lang \
        --runner DataflowRunner \
        --project tweet-pipe-supreme \
        --region europe-north1 \
@@ -102,10 +106,11 @@ See
        --service_account_email tweet-pipe-supreme@tweet-pipe-supreme.iam.gserviceaccount.com
 	   --max_num_workers N # optional \
 	   --worker_machine_type e2-standard-2 # optional \
+       --streaming
    ```
 
 
-## Python develpment
+## Python development
 
 Install package as editable so that you can `import` it and 
 its (sub)modules as it would be installed normally:
@@ -123,6 +128,15 @@ Autofix
 
 `pytest`
 
+
+## Debugging DataFlow
+
+If getting mysterious behaviour like DataFlow repeatedly 
+recreating PubSub (temporary) subscription, it is probably 
+because of insufficient permissions for the service account used.
+DataFlowRunner does not (necessarily) report these errors, 
+and therefore, it is better to try with DirectRunner to 
+debug permissions.
 
 
 ## DOES NOT WORK: Install Mac M1... why?!? 

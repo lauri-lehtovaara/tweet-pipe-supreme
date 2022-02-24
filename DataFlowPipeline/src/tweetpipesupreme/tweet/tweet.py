@@ -4,18 +4,43 @@ from typing import TypedDict, List, Optional
 
 
 class TweetNlpData(TypedDict, total=False):
-    """Tweet NLP data"""
-    # FIXME: improve docs
+    """Tweet NLP data
+
+    All attributes are optional
+
+    Attributes
+    ----------
+    language : str, optional
+        ID of the predicted language
+    categories : List[str], optional
+        List of IDs of predicted categories
+    embedding : List[List[float]], optional
+        Embedding vector for the tweet
+    """
     language:   str
     categories: List[str]
-    #sentences: List[str]
-    embedding:  List[List[float]]
+    embedding:  List[float]
 
 
 class Tweet(TypedDict, total=True):
-    """Tweet"""
-    # FIXME: implement fromJSON and toJSON
-    # FIXME: improve docs
+    """Tweet
+
+    All attributes are optional
+
+    Attributes
+    ----------
+    id : str
+        ID of the tweet
+    user : str
+        ID of the sender
+    text : str
+        Tweet's text
+    timestamp : str
+        ISO timestamp
+    nlp : TweetNlpData, optional
+        Optional NLP predictions
+    """
+    # FIXME: implement fromJSON and toJSON with validation
     id:        str
     user:      str
     text:      str

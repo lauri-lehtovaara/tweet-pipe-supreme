@@ -1,15 +1,20 @@
+"""Test tweetpipesupreme.language"""
+# pylint: disable=line-too-long
+
 import os
 import json
 import uuid
 
 import urllib.request
 
-
-from tweetpipesupreme.language.detect_language_dofn import DetectLanguageDoFn
 from apache_beam.io.localfilesystem import LocalFileSystem
 
-"""Test DetectLanguageDoFn"""
-def test_DetectLanguageDoFn():
+from tweetpipesupreme.language.detect_language_dofn import DetectLanguageDoFn
+from tweetpipesupreme.language.models import FastTextLid176Model
+
+
+def test_detect_language_do_fn():
+    """Test DetectLanguageDoFn"""
 
     # download and store to tmp file t
     tmp_path = f'/tmp/{str(uuid.uuid4())}'
@@ -17,17 +22,21 @@ def test_DetectLanguageDoFn():
 
     if not os.path.exists(tmp_path):
         os.mkdir(tmp_path)
-        
-    urllib.request.urlretrieve("https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz", tmp_file)
+
+    urllib.request.urlretrieve(
+        "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz", tmp_file)
 
     filesystem = LocalFileSystem({})
     model_path = tmp_file
-    
-    
-    # create DoFn
-    dofn = DetectLanguageDoFn(
+
+    model = FastTextLid176Model(
         filesystem=filesystem,
         model_path=model_path
+    )
+
+    # create DoFn
+    dofn = DetectLanguageDoFn(
+        model=model
     )
 
     # download and setup model
@@ -50,7 +59,6 @@ def test_DetectLanguageDoFn():
         '{ "id": "test3", "text": "Mitäs mitäs suomea!!!", "user": "test", "timestamp": "2022-02-18T10:26:17.028Z" }'
     )
     assert json.loads(next(tweets))['nlp']['language'] == 'fi'
-
 
     # teardown
     dofn.teardown()
