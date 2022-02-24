@@ -27,8 +27,9 @@ With local credentials:
 ```
 TWITTER_API_AUTH_TOKEN='AAAAAAAAAAAAAAAAAAAAAKb0ZAEAAAA...' \
    GOOGLE_APPLICATION_CREDENTIALS=../credentials/<service-account>....json \
-   TWEET_PUBSUB_PROJECT_ID='<GCP project ID' \
+   TWEET_PUBSUB_PROJECT_ID='tweet-pipe-supreme' \
    TWEET_TOPIC='tweet' \
+   TWEET_STREAM_RULES='#ukraine OR #ukraina OR #украина' \
    npm start
 ```
 

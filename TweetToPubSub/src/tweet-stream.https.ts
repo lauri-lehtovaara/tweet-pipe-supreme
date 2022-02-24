@@ -9,9 +9,9 @@ import { logger } from './logger';
  * TweetStreamConfig
  */
 export interface TweetStreamConfig {
-    public maxQueueSize: number;
-    public streamUrl: string;
-    public authToken: string;
+    maxQueueSize: number;
+    streamUrl: string;
+    authToken: string;
 };
 
 /**

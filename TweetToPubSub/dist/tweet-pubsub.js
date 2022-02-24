@@ -9,15 +9,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TweetPubSub = exports.TweetPubSubConfig = void 0;
+exports.TweetPubSub = void 0;
 const pubsub_1 = require("@google-cloud/pubsub");
 const tweet_1 = require("./tweet");
-/**
- * TweetPubSubConfig
- */
-class TweetPubSubConfig {
-}
-exports.TweetPubSubConfig = TweetPubSubConfig;
 /**
  * TweetPubSub
  */
