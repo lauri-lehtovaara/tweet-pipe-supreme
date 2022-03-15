@@ -38,4 +38,11 @@ With GCP Secret Manager:
 TODO
 ```
 
+## TODO
+
+1. Add create JSON schema and add validation for tweets
+2. Add error handling, e.g., malformed tweet / unknown data, network error, ...
+3. Switch to Gcloud logging
+4. Tests for tweets, validation, testing with mocked Twitter API and PubSub
+5. Test with Terraform (setup, test, teardown)
 

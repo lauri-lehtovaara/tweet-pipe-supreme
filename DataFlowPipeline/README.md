@@ -160,3 +160,9 @@ pip uninstall cython
 # Finally!
 pip install "apache-beam[gcp]"
 ```
+
+## TODO
+
+1. Validation for tweets
+2. Error reporting (e.g. validation errors)
+3. Stats reporting (e.g. # of tweets per sec per language)
