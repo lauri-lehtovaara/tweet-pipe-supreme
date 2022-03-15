@@ -3,9 +3,12 @@
 import argparse
 import logging
 import sys
+import json
 #import re
-import datetime
+from datetime import datetime
+import time
 
+from typing import Iterator, Tuple
 
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
@@ -16,13 +19,18 @@ from apache_beam.io import ReadFromPubSub, WriteToPubSub
 
 from apache_beam import ParDo, Map, WindowInto
 
-from apache_beam.window import FixedWindows
+from apache_beam.transforms.window import FixedWindows, TimestampedValue
+from apache_beam.transforms.trigger import AfterWatermark, AfterProcessingTime, AccumulationMode, AfterCount
+from apache_beam.utils.timestamp import Duration
+
+from apache_beam.transforms.combiners import Count
 
 from apache_beam.io.gcp.gcsfilesystem import GCSFileSystem
 
 
 from tweetpipesupreme.language import DetectLanguageDoFn
 from tweetpipesupreme.language.models import FastTextLid176Model
+from tweetpipesupreme.tweet import Tweet
 
 
 
@@ -64,8 +72,12 @@ def ReadInputTweets(pipeline, input_path):
     else:
         raise RuntimeError(f"Invalid input {input_path}")
 
-    # return
-    return input_tweets
+
+    # Parse JSON, validate (TODO) and return
+    return (
+        input_tweets
+        | 'JSON to Tweet object' >> Map(lambda line: json.loads(line))
+    )
 
 
     
@@ -83,65 +95,94 @@ def WriteOutputTweets(pipeline, output_path):
         If `ps://projects/<project>/topics/<topic>`, `output` is expected to be a PubSub topic.`    
     """
     # output
-    output_tweets = None # pylint: disable=unused-variable
+    output_tweets = ( # pylint: disable=unused-variable
+        pipeline
+        | 'Tweet object to JSON' >> Map(lambda tweet: json.dumps(tweet))
+    )
+    
     # storage bucket
     if output_path.startswith('gs://'):
-        output_tweets = (
-            tweets_with_language
-            | 'Write to file' >> WriteToFiles(known_args.output)
+        return (
+            output_tweets # tweets_with_language
+            | 'Write to file' >> WriteToFiles(output_path)
         )
     # PubSub
-    elif known_args.output.startswith('ps://'):
-        output_tweets = (
-            tweets_with_language
+    elif output_path.startswith('ps://'):
+        return (
+            output_tweets # tweets_with_language
             | 'String to bytes' >> Map(lambda line: line.encode('utf-8'))
-            | 'Write to pubsub' >> WriteToPubSub(topic=known_args.output.replace('ps://',''))
+            | 'Write to pubsub' >> WriteToPubSub(topic=output_path.replace('ps://',''))
         )
     # invalid sink
     else:
-        raise RuntimeError(f"Invalid output {known_args.output}")
+        raise RuntimeError(f"Invalid output {output_path}")
 
     return output_tweets
 
 
 
-def LanguageStats(pipeline):
-    # set timestamp for windowing from tweets timestamp
-    timestamper = lambda tweet: beam.window.TimestampedValue(
+# return (language, window start, window end, tweet count)
+class LangCountWithIntervalDoFn(beam.DoFn):
+    def __init__(self):
+        super().__init__()
+        
+    def process(self, element: Tuple[str,int], window=beam.DoFn.WindowParam) -> Iterator[Tuple[str,int,int,int]]:
+        row = (
+            element[0], # language
+            window.start.to_utc_datetime().astimezone().isoformat(),
+            window.end.to_utc_datetime().astimezone().isoformat(),
+            element[1] # count
+        )
+        logging.debug(row)
+        yield row
+
+# set timestamp for windowing from tweets timestamp
+def timestamper(tweet):
+    return TimestampedValue(
         tweet,
-        datetime.datetime.strptime(
-            tweet['timestamp'],
-            "%Y-%m-%dT%H:%M:%S.%f%z"
+        time.mktime(
+            datetime.strptime(
+                tweet['timestamp'],
+                "%Y-%m-%dT%H:%M:%S.%f%z"
+            )
+            .timetuple()
         )
     )
 
-    # map tweet to language id
-    def language_extractor(tweet):
-        try:
-            return tweet['nlp']['language']
-        except KeyError:
-            return '??'
+# map tweet to language id
+def language_extractor(tweet):
+    try:
+        return tweet['nlp']['language']
+    except KeyError:
+        return '??'
 
-    # return (language, window begin, window end, tweet count)
-    class LangCountWithIntervalDoFn(beam.DoFn):
-        def __init__(self):
-            super().__init__()
-
-        def process(self, element: tuple[str,int], *args, **kwargs) -> Iterator[tuple[str,int,int,int]]:
-            yield (
-                element[0], # language
-                window.begin.to_utc_datetime(),
-                window.end.to_utc_datetime(),
-                element[1] # count
-            )
-        
+def print_and_return(elem):
+    logging.info(elem)
+    return elem
+    
+def LanguageStats(pipeline):
     return (
         pipeline
         | 'Assign timestamps' >> Map(timestamper)
-        | 'Fixed 60s windows' >> WindowInto(FixedWindows(60))
+        | 'Fixed 10s windows' >> WindowInto(
+            FixedWindows(Duration(seconds=10)),
+            # allowed_lateness is not what we want
+            # allowed_lateness=Duration(seconds=60)
+            trigger=AfterWatermark(
+                early=None, # dont fire before watermark
+                late=AfterProcessingTime(
+                    Duration(seconds=10) # fire every 10secs
+                )
+            ),
+            # accept new data 60s after watermark
+            allowed_lateness=Duration(seconds=60),
+            # send accumulated result instead of only new data
+            accumulation_mode=AccumulationMode.ACCUMULATING
+        )
         | 'Extract language' >> Map(language_extractor)
-        | 'Tweets per lang per window' >> beam.combiners.Count.PerElement()
-        | 'Add window info' >> DoFn(LangCountWithIntervalDoFn())
+        | 'Print and return' >> Map(print_and_return)
+        | 'Tweets per lang per window' >> Count.PerElement()
+        | 'Add window info' >> ParDo(LangCountWithIntervalDoFn())
     )
 
 
@@ -197,6 +238,7 @@ def run(argv=None):
     # if does not exists
     if not filesystem.exists(known_args.fasttext_lid176_model_path):
         raise RuntimeError(f"File {known_args.fasttext_lid176_model_path} does not exist")
+        
 
     # language detection model
     model = FastTextLid176Model(
@@ -235,8 +277,11 @@ def run(argv=None):
             tweets_with_language
         )
 
+        tmp = (stats | 'Print stats' >> Map(print))
 
         
 
 if __name__ == '__main__':
+    #logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     run()

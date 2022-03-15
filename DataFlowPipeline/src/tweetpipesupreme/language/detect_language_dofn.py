@@ -6,8 +6,6 @@ import re
 
 from typing import Iterator
 
-from typing import Iterator
-
 import apache_beam as beam
 from apache_beam.io.filesystem import FileSystem
 
@@ -24,7 +22,7 @@ from tweetpipesupreme.language.models import BaseModel
 
 
 class DetectLanguageDoFn(beam.DoFn):  # pylint: disable=abstract-method
-    """Detect language apache_beam.DoFn
+    """Detect language DoFn
 
     Parameters
     ----------
@@ -51,23 +49,23 @@ class DetectLanguageDoFn(beam.DoFn):  # pylint: disable=abstract-method
         """Tear down (only once per worker)"""
         self.model.teardown()
 
-    def process(self, element: str, *args, **kwargs) -> Iterator[str]:
-        """Process a string containing a Tweet as JSON
+    def process(self, element: Tweet, *args, **kwargs) -> Iterator[Tweet]:
+        """Process Tweet
 
         Parameters:
-            element (str): A string containing a Tweet as JSON
+            element (Tweet): Tweet
 
         Returns:
-            str: A string containing a Tweet in JSON where
-                 tweet.nlp.language is set to predicted language.
+            Tweet: Tweet where tweet.nlp.language is set to predicted language.
         """
 
-        # parse JSON
-        tweet: Tweet = json.loads(element)
-
-        # predict language
+        # just rename
+        tweet = element
+        
+        # remove new lines
         text = re.sub(r'[\r\n]',' ', tweet['text'])
-
+        
+        # predict language
         lang_id = self.model.predict(text)
 
         # add nlp field
@@ -77,10 +75,10 @@ class DetectLanguageDoFn(beam.DoFn):  # pylint: disable=abstract-method
         # set tweet.nlp.language
         tweet['nlp']['language'] = lang_id
 
-        # return tweet as JSON
-        yield json.dumps(tweet)
+        # return tweet
+        yield tweet
 
-        # Left here until I remember this by heart :)
+        # Not used, but left here until I remember this by heart :)
         # merge dict like JS { ...tweet, ...langDict }
         # tweetWithNlp : Tweet = dict(
         #    tweet,

@@ -41,6 +41,8 @@ class FastTextLid176Model(BaseModel):  # pylint: disable=too-few-public-methods,
         """
 
         # open model
+        logging.warning('FastTextLid176Model.setup: Loading a big model on setup is NOT necessarily a good idea, because it gets loaded again and again if scaling changes. The model might be part of installation process, i.e., setup.py or the package. BUT best option might be to use CONTAINERS!!!')
+        
         logging.debug('<<< FastTextLid176Model.setup: opening model... >>>')
         model_file = self.filesystem.open(self.model_path)
 

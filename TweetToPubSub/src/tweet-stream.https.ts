@@ -12,7 +12,7 @@ export interface TweetStreamConfig {
     maxQueueSize: number;
     streamUrl: string;
     authToken: string;
-};
+}
 
 /**
  * TweetStream
@@ -25,7 +25,7 @@ export class TweetStream {
 
     protected request: http.ClientRequest;
 
-    protected isOpen: boolean = false;
+    protected isOpen = false;
 
     protected _error: Error;
 
@@ -33,7 +33,7 @@ export class TweetStream {
      * error if has one
      */
     public get error() : Error {
-	return this._error;
+        return this._error;
     }
 
 
@@ -49,30 +49,30 @@ export class TweetStream {
      * connects to twitter api and starts recording tweets
      */
     async connect() : Promise<void> {
-	const { streamUrl, authToken } = this.config;
+        const { streamUrl, authToken } = this.config;
 
-	const options = {
+        const options = {
 	    headers: {
-		"Content-type":  "application/json",
-		"Authorization": `Bearer ${authToken}`
+                "Content-type":  "application/json",
+                "Authorization": `Bearer ${authToken}`
 	    }
-	};
+        };
 
-	const onData  = this.onData.bind(this);
-	const onError = this.onError.bind(this);
-	const onEnd   = this.onEnd.bind(this);
+        const onData  = this.onData.bind(this);
+        const onError = this.onError.bind(this);
+        const onEnd   = this.onEnd.bind(this);
 
 
-	return new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
 
 	    this.request = https.get(
-		streamUrl,
-		options,
-		response => {
+                streamUrl,
+                options,
+                response => {
 		    if ( response.statusCode !== 200 ) {
-			const error = new Error('Authentication failed');
-			onError(error);
-			return reject(error);
+                        const error = new Error('Authentication failed');
+                        onError(error);
+                        return reject(error);
 		    }
 
 		    response.on('data', onData);
@@ -82,12 +82,12 @@ export class TweetStream {
 		    this.isOpen = true;
 
 		    resolve();
-		})
-		.on('error', (error) => {
+                })
+                .on('error', (error) => {
 		    onError(error);
 		    reject(error);
-		});
-	});
+                });
+        });
     }
 
 
@@ -97,13 +97,13 @@ export class TweetStream {
      * returns true if stream is ready and recording tweets
      */
     ready() : boolean {
-	if ( this._error )
+        if ( this._error )
 	    return false;
 
-	if ( this.isOpen )
+        if ( this.isOpen )
 	    return true;
 
-	return false;
+        return false;
     }
 
 
@@ -115,12 +115,12 @@ export class TweetStream {
      * return undefined if no error and we have consumed all tweets
      */
     next() : Tweet | undefined {
-	const tweet = this.queue.shift();
+        const tweet = this.queue.shift();
 
-	if ( tweet )
+        if ( tweet )
 	    return tweet;
 
-	if ( this._error )
+        if ( this._error )
 	    throw this._error;
     }
 
@@ -128,7 +128,7 @@ export class TweetStream {
      * close
      */
     async close() {
-	return this.request.destroy();
+        return this.request.destroy();
     }
 
     /**
@@ -138,21 +138,21 @@ export class TweetStream {
      * note: do not call directly
      */
     protected onData(buffer: Buffer) {
-	if ( ! buffer ) return;
+        if ( ! buffer ) return;
 
-	try {
+        try {
 	    const jsonString = buffer.toString('utf-8');
 	    if ( jsonString === '\r\n' ) {
-		logger.debug('<<< TweetStream got keep alive >>>');
-		return;
+                logger.debug('<<< TweetStream got keep alive >>>');
+                return;
 	    }
 
 	    const data = JSON.parse(jsonString);
 	    // logger.debug(data);
 
 	    if ( this.queue.length >= this.config.maxQueueSize ) {
-		logger.debug("Tweet stream's queue is full... dropping oldest");
-		this.queue.shift();
+                logger.debug("Tweet stream's queue is full... dropping oldest");
+                this.queue.shift();
 	    }
 
 	    const tweet = Tweet.fromTwitterJson(data);
@@ -161,10 +161,10 @@ export class TweetStream {
 
 	    this.queue.push(tweet);
 
-	} catch(error) {
+        } catch(error) {
 	    logger.debug(error);
 	    this._error = error;
-	}
+        }
     }
 
     /**
@@ -174,7 +174,7 @@ export class TweetStream {
      * note: do not call directly
      */
     protected onEnd() {
-	this.isOpen = false;
+        this.isOpen = false;
     }
 
     /**
@@ -184,8 +184,8 @@ export class TweetStream {
      * note: do not call directly
      */
     protected onError(error: Error) {
-	logger.debug(error);
-	this._error = error;
+        logger.debug(error);
+        this._error = error;
     }
 }
 

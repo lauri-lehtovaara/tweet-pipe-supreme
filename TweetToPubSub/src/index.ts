@@ -12,7 +12,7 @@ const tweetStreamConfig = {
     ),
     authToken: process.env.TWITTER_API_AUTH_TOKEN,
     maxQueueSize: (
-	process.env.TWEET_STREAM_MAX_QUEUE_SIZE
+        process.env.TWEET_STREAM_MAX_QUEUE_SIZE
 	    ? parseInt(process.env.TWEET_STREAM_MAX_QUEUE_SIZE,10)
 	    : 10000
     )
@@ -28,7 +28,7 @@ const tweetPubSubConfig = {
 
 async function sleep(ms) {
     return new Promise(
-	(resolve) => setTimeout(resolve, ms)
+        (resolve) => setTimeout(resolve, ms)
     );
 }
 
@@ -39,14 +39,14 @@ async function run() {
         logger.info(
             "Environment variable TWITTER_FILTERED_STREAM_RULES not set... using existing rules"
         );
-    
+
     // tweet pubsub
     const tweetPubSub = new TweetPubSub(tweetPubSubConfig);
     try {
-	await tweetPubSub.connect();
+        await tweetPubSub.connect();
     } catch(error) {
-	logger.error(error);
-	return;
+        logger.error(error);
+        return;
     }
 
     // tweet stream from twitter api
@@ -58,28 +58,28 @@ async function run() {
                 tweetStreamConfig.rules
             );
         }
-	await tweetStream.connect();
+        await tweetStream.connect();
     } catch(error) {
-	logger.error(error);
-	return;
+        logger.error(error);
+        return;
     }
 
     while(true) {
-	try {
+        try {
 	    const tweet = tweetStream.next();
 	    if ( tweet ) {
-		logger.debug('Tweet received', tweet);
-		await tweetPubSub.publish(tweet);
+                logger.debug('Tweet received', tweet);
+                await tweetPubSub.publish(tweet);
 	    }
 	    else {
-		await sleep(10);
+                await sleep(10);
                 if ( tweetStream.error )
                     logger.debug(tweetStream.error)
 	    }
-	} catch(error) {
+        } catch(error) {
 	    logger.error(error);
 	    break;
-	}
+        }
     }
 }
 

@@ -11,7 +11,7 @@ export interface TweetStreamConfig {
     maxQueueSize: number;
     streamUrl: string;
     authToken: string;
-};
+}
 
 /**
  * TweetStream
@@ -21,21 +21,21 @@ export interface TweetStreamConfig {
  */
 export class TweetStream {
     protected buffer: Buffer = Buffer.from([]);
-    
+
     protected queue: Tweet[] = [];
 
-    protected isOpen: boolean = false;
+    protected isOpen = false;
 
     protected _error: Error;
 
-    protected reconnectTimeout: number = 100;
+    protected reconnectTimeout = 100;
 
 
     /**
      * Error if has one
      */
     public get error() : Error {
-	return this._error;
+        return this._error;
     }
 
     /**
@@ -75,7 +75,7 @@ export class TweetStream {
                     ? prevRules.data.map((rule) => rule.id)
                     : []
             )
-            
+
             // delete  previous rules
             const deleteOptions = {
 	        headers: {
@@ -112,7 +112,7 @@ export class TweetStream {
                 .json();
 
             logger.debug('New rules for tweet stream', newRules);
-            
+
             return;
         } catch(error) {
             logger.error('error');
@@ -124,33 +124,33 @@ export class TweetStream {
      * Connect
      */
     async connect() : Promise<any> {
-	const { streamUrl, authToken } = this.config;
+        const { streamUrl, authToken } = this.config;
 
-	const options = {
+        const options = {
 	    headers: {
-		"User-Agent":    "tweet-stream",
-		// "Content-Type":  "application/json",
-		"Authorization": `Bearer ${authToken}`
+                "User-Agent":    "tweet-stream",
+                // "Content-Type":  "application/json",
+                "Authorization": `Bearer ${authToken}`
 	    },
-            //timeout: { request: 3600*1000 }
-	};
+            // timeout: { request: 3600*1000 }
+        };
 
-	const stream = await got.stream(
+        const stream = await got.stream(
 	    `${streamUrl}?tweet.fields=author_id,created_at`,
 	    options
-	);
+        );
 
-	const onResponse = this.onResponse.bind(this);
-	const onData  = this.onData.bind(this);
-	const onError = this.onError.bind(this);
-	const onEnd   = this.onEnd.bind(this);
+        const onResponse = this.onResponse.bind(this);
+        const onData  = this.onData.bind(this);
+        const onError = this.onError.bind(this);
+        const onEnd   = this.onEnd.bind(this);
 
-	stream.on('data', onData);
-	stream.on('err', onError);
-	stream.on('done', onEnd);
-	stream.on('response', onResponse);
+        stream.on('data', onData);
+        stream.on('err', onError);
+        stream.on('done', onEnd);
+        stream.on('response', onResponse);
 
-	return stream;
+        return stream;
     }
 
     /**
@@ -159,13 +159,13 @@ export class TweetStream {
      * returns true if stream is ready and recording tweets
      */
     ready() : boolean {
-	if ( this._error )
+        if ( this._error )
 	    return false;
 
-	if ( this.isOpen )
+        if ( this.isOpen )
 	    return true;
 
-	return false;
+        return false;
     }
 
 
@@ -177,12 +177,12 @@ export class TweetStream {
      * return undefined if no error and we have consumed all tweets
      */
     next() : Tweet | undefined {
-	const tweet = this.queue.shift();
+        const tweet = this.queue.shift();
 
-	if ( tweet )
+        if ( tweet )
 	    return tweet;
 
-	if ( this._error )
+        if ( this._error )
 	    throw this._error;
     }
 
@@ -202,10 +202,10 @@ export class TweetStream {
      * note: do not call directly
      */
     protected onData(data: any) {
-        //logger.debug('onData', data);
-	if ( ! data ) return;
+        // logger.debug('onData', data);
+        if ( ! data ) return;
 
-	if ( ! ( data instanceof Buffer ) )
+        if ( ! ( data instanceof Buffer ) )
 	    return this.onError(new Error(JSON.stringify(data)));
 
         this.buffer = Buffer.concat([this.buffer, data]);
@@ -218,14 +218,14 @@ export class TweetStream {
                 this.onLine(line.toString('utf-8'));
             }
             else {
-		logger.debug('<<< TweetStream got keep alive >>>');
+                logger.debug('<<< TweetStream got keep alive >>>');
             }
-            
+
             this.buffer = this.buffer.slice(pos+2);
 
             pos = this.buffer.indexOf(Buffer.from('\r\n'));
         }
-    }        
+    }
 
     /**
      * onLine
@@ -234,15 +234,15 @@ export class TweetStream {
      * note: do not call directly
      */
     protected onLine(jsonLine: string) {
-	try {
+        try {
 	    logger.debug(jsonLine);
 
 	    const json = JSON.parse(jsonLine);
 	    logger.debug(json);
 
 	    if ( this.queue.length >= this.config.maxQueueSize ) {
-		logger.debug("Tweet stream's queue is full... dropping oldest");
-		this.queue.shift();
+                logger.debug("Tweet stream's queue is full... dropping oldest");
+                this.queue.shift();
 	    }
 
 	    const tweet = Tweet.fromTwitterJson(json);
@@ -251,10 +251,10 @@ export class TweetStream {
 
 	    this.queue.push(tweet);
 
-	} catch(error) {
+        } catch(error) {
 	    logger.debug(error);
 	    this._error = error;
-	}
+        }
     }
 
 
@@ -265,8 +265,8 @@ export class TweetStream {
      * note: do not call directly
      */
     protected onResponse() {
-	logger.debug('TweetStream opened');
-	this.isOpen = true;
+        logger.debug('TweetStream opened');
+        this.isOpen = true;
     }
 
     /**
@@ -276,8 +276,8 @@ export class TweetStream {
      * note: do not call directly
      */
     protected onEnd() {
-	logger.debug('TweetStream closed');
-	this.isOpen = false;
+        logger.debug('TweetStream closed');
+        this.isOpen = false;
     }
 
     /**
@@ -287,22 +287,22 @@ export class TweetStream {
      * note: do not call directly
      */
     protected onError(error: NodeJS.ErrnoException) {
-	// on connection reset, try to reconnect
-	if (  error.code === 'ECONNRESET' ) {
+        // on connection reset, try to reconnect
+        if (  error.code === 'ECONNRESET' ) {
             logger.warn("TweetStream faced a connection error occurred. Reconnecting...");
 	    const connect = this.connect.bind(this);
 	    this.reconnectTimeout = Math.min(this.reconnectTimeout * 2, 10000);
 
 	    setTimeout(() => {
-		connect();
+                connect();
             }, this.reconnectTimeout);
-	}
+        }
 
-	// otherwise, just set the error
-	else {
+        // otherwise, just set the error
+        else {
 	    logger.debug(error);
 	    this._error = error;
-	}
+        }
     }
 }
 

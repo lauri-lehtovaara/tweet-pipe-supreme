@@ -21,18 +21,22 @@ export class TweetPubSub {
      * connect
      */
     connect() {
-	const { projectId } = this.config;
-	this.pubsub = new PubSub({ projectId });
+        const { projectId } = this.config;
+        this.pubsub = new PubSub({ projectId });
     }
 
     /**
      * publish tweet
      */
     async publish(tweet: Tweet) {
-	const { topic } = this.config;
+        const { topic } = this.config;
 
-	const buffer = Buffer.from(Tweet.toJson(tweet), 'utf-8');
-	return await this.pubsub
+        // connect if not connected
+        if ( ! this.pubsub )
+            this.connect();
+
+        const buffer = Buffer.from(Tweet.toJson(tweet), 'utf-8');
+        return await this.pubsub
 	    .topic(topic)
 	    .publish(buffer);
     }

@@ -20,12 +20,12 @@ export class Tweet {
 
     static fromTwitterJson(json: any) : Tweet {
         // FIXME: add validation
-	const { data } = json;
-	const { id, text, created_at, author_id } = data;
-	return { id, text, timestamp: created_at, author: author_id };
+        const { data } = json;
+        const { id, text, created_at, author_id } = data;
+        return { id, text, timestamp: created_at, author: author_id };
     }
 
     static toJson(tweet: Tweet) {
-	return JSON.stringify(tweet)
+        return JSON.stringify(tweet)
     }
 }
