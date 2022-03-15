@@ -4,6 +4,8 @@ import argparse
 import logging
 import sys
 #import re
+import datetime
+
 
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
@@ -11,12 +13,137 @@ from apache_beam.io import ReadFromText
 from apache_beam.io.fileio import WriteToFiles
 #from apache_beam.io.fileio import MatchFiles, ReachMatcher, ReadableFile
 from apache_beam.io import ReadFromPubSub, WriteToPubSub
-from apache_beam import ParDo, Map
+
+from apache_beam import ParDo, Map, WindowInto
+
+from apache_beam.window import FixedWindows
 
 from apache_beam.io.gcp.gcsfilesystem import GCSFileSystem
 
+
 from tweetpipesupreme.language import DetectLanguageDoFn
 from tweetpipesupreme.language.models import FastTextLid176Model
+
+
+
+def ReadInputTweets(pipeline, input_path):
+    """Read input tweets to pipeline
+
+    Parameters
+    ----------
+    pipeline: apache_beam.Pipeline
+        Pipeline
+
+    input_path: str
+        Input path
+        If `gs://<path>`, `input` is expected to be _a path to a file_ in a GCP storage bucket.
+        If `ps://projects/<project>/subscriptions/<subscription>`, `input` is expected to be a PubSub subscription.`    
+    """
+    
+    # input
+    input_tweets = None
+    # storage bucket
+    if input_path.startswith('gs://'):
+        input_tweets = (
+            pipeline
+            | 'Read lines from file' >> ReadFromText(input_path)
+            # Another option would be to read lines from wild card path:
+            #| MatchFiles(known_args.input)
+            #| ReadMatches()
+            #| beam.Map(lambda x: x.read())
+        )
+        # PubSub
+    elif input_path.startswith('ps://'):
+        input_tweets = (
+            pipeline
+            | 'Read from pubsub' >> ReadFromPubSub(subscription=input_path.replace('ps://',''))
+            #| 'Read from pubsub' >> ReadFromPubSub(topic=known_args.input.replace('ps://',''))
+            | 'Bytes to string' >> Map(lambda line: line.decode('utf-8'))
+        )
+        # invalid source
+    else:
+        raise RuntimeError(f"Invalid input {input_path}")
+
+    # return
+    return input_tweets
+
+
+    
+def WriteOutputTweets(pipeline, output_path):
+    """Write output tweets from pipeline
+
+    Parameters
+    ----------
+    pipeline: apache_beam.Pipeline
+        Pipeline
+
+    output_path: str
+        Output path
+        If `gs://<path>`, `output` is expected to be _a path_ in a GCP storage bucket.
+        If `ps://projects/<project>/topics/<topic>`, `output` is expected to be a PubSub topic.`    
+    """
+    # output
+    output_tweets = None # pylint: disable=unused-variable
+    # storage bucket
+    if output_path.startswith('gs://'):
+        output_tweets = (
+            tweets_with_language
+            | 'Write to file' >> WriteToFiles(known_args.output)
+        )
+    # PubSub
+    elif known_args.output.startswith('ps://'):
+        output_tweets = (
+            tweets_with_language
+            | 'String to bytes' >> Map(lambda line: line.encode('utf-8'))
+            | 'Write to pubsub' >> WriteToPubSub(topic=known_args.output.replace('ps://',''))
+        )
+    # invalid sink
+    else:
+        raise RuntimeError(f"Invalid output {known_args.output}")
+
+    return output_tweets
+
+
+
+def LanguageStats(pipeline):
+    # set timestamp for windowing from tweets timestamp
+    timestamper = lambda tweet: beam.window.TimestampedValue(
+        tweet,
+        datetime.datetime.strptime(
+            tweet['timestamp'],
+            "%Y-%m-%dT%H:%M:%S.%f%z"
+        )
+    )
+
+    # map tweet to language id
+    def language_extractor(tweet):
+        try:
+            return tweet['nlp']['language']
+        except KeyError:
+            return '??'
+
+    # return (language, window begin, window end, tweet count)
+    class LangCountWithIntervalDoFn(beam.DoFn):
+        def __init__(self):
+            super().__init__()
+
+        def process(self, element: tuple[str,int], *args, **kwargs) -> Iterator[tuple[str,int,int,int]]:
+            yield (
+                element[0], # language
+                window.begin.to_utc_datetime(),
+                window.end.to_utc_datetime(),
+                element[1] # count
+            )
+        
+    return (
+        pipeline
+        | 'Assign timestamps' >> Map(timestamper)
+        | 'Fixed 60s windows' >> WindowInto(FixedWindows(60))
+        | 'Extract language' >> Map(language_extractor)
+        | 'Tweets per lang per window' >> beam.combiners.Count.PerElement()
+        | 'Add window info' >> DoFn(LangCountWithIntervalDoFn())
+    )
+
 
 
 def run(argv=None):
@@ -77,7 +204,7 @@ def run(argv=None):
         model_path = known_args.fasttext_lid176_model_path
     )
 
-    # DoFn
+    # detect language DoFn
     detect_language_do_fn = DetectLanguageDoFn(
         model = model
     )
@@ -86,28 +213,10 @@ def run(argv=None):
     with beam.Pipeline(options=pipeline_opts) as pipeline:
 
         # input
-        input_tweets = None
-        # storage bucket
-        if known_args.input.startswith('gs://'):
-            input_tweets = (
-                pipeline
-                | 'Read lines from file' >> ReadFromText(known_args.input)
-                #| MatchFiles(known_args.input)
-                #| ReadMatches()
-                #| beam.Map(lambda x: x.read())
-            )
-        # PubSub
-        elif known_args.input.startswith('ps://'):
-            input_tweets = (
-                pipeline
-                | 'Read from pubsub' >> ReadFromPubSub(subscription=known_args.input.replace('ps://',''))
-                #| 'Read from pubsub' >> ReadFromPubSub(topic=known_args.input.replace('ps://',''))
-                | 'Bytes to string' >> Map(lambda line: line.decode('utf-8'))
-                )
-        # invalid source
-        else:
-            raise RuntimeError(f"Invalid input {known_args.input}")
-
+        input_tweets = ReadInputTweets(
+            pipeline,
+            known_args.input
+        )
 
         # language detection
         tweets_with_language = (
@@ -116,74 +225,18 @@ def run(argv=None):
         )
 
         # output
-        output_tweets = None # pylint: disable=unused-variable
-        # storage bucket
-        if known_args.output.startswith('gs://'):
-            output_tweets = (
-                tweets_with_language
-                | 'Write to file' >> WriteToFiles(known_args.output)
-            )
-        # PubSub
-        elif known_args.output.startswith('ps://'):
-            output_tweets = (
-                tweets_with_language
-                | 'String to bytes' >> Map(lambda line: line.encode('utf-8'))
-                | 'Write to pubsub' >> WriteToPubSub(topic=known_args.output.replace('ps://',''))
-                )
-        # invalid sink
-        else:
-            raise RuntimeError(f"Invalid output {known_args.output}")
-
-def run(argv=None):
-    """Runs language detection pipeline component"""
-
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        '--input',
-        dest='input',
-        default=None,
-        help='Path to read tweets from (as JSONL)'
-    )
-
-    parser.add_argument(
-        '--model_path',
-        dest='model_path',
-        # 'gs://tweet-pipe-supreme/dataflow-test/models/lid.176.ftz',
-        default=None,
-        help='Path to model'
-    )
-
-    parser.add_argument(
-        '--output',
-        dest='output',
-        default=None,
-        help='Path to write tweets to (as JSONL)'
-    )
-
-    known_args, pipeline_args = parser.parse_known_args(argv)
-
-    pipeline_opts = PipelineOptions(pipeline_args)
-
-    filesystem = GCSFileSystem(pipeline_opts)
-    if not filesystem.exists(known_args.model_path):
-        logging.error("File %s does not exist", known_args.model_path)
-        sys.exit(13)
-
-        detect_language_do_fn = DetectLanguageDoFn(
-            filesystem = filesystem,
-            model_path = known_args.model_path
+        output_tweets = WriteOutputTweets(
+            tweets_with_language,
+            known_args.output
         )
 
-        with beam.Pipeline(options=pipeline_opts) as pipeline:
-            # pylint: disable=unused-variable
-            tweets = (
-                pipeline
-                | 'Read' >> ReadFromText(known_args.input)
-                | 'Predict language' >> ParDo(detect_language_do_fn) # ParDo => Map ?
-                | 'Write' >> WriteToText(known_args.output)
-            )
+        # stats
+        stats = LanguageStats(
+            tweets_with_language
+        )
 
+
+        
 
 if __name__ == '__main__':
     run()
